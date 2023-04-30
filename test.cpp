@@ -35,11 +35,9 @@ remove_complex_t<Prec> deviation(Prec x, Prec y) {
 }
 
 template<typename Prec>
-void compare_with_reference_trsv(char uplo, char trans, char diag, int n,
+remove_complex_t<Prec> compare_with_reference_trsv(char uplo, char trans, char diag, int n,
     const Prec *__restrict__ A, int ldA, Prec *__restrict__ x, int incx)
 {
-    using Real = remove_complex_t<Prec>;
-
     // Take a copy of the initial right-hand side.
     Prec *__restrict__ y = (Prec *)malloc(n * sizeof(Prec));
     for (int i = 0; i < n; i++) {
@@ -71,6 +69,7 @@ void compare_with_reference_trsv(char uplo, char trans, char diag, int n,
     trsv<Prec>(uplo, trans, diag, n, A, ldA, y, incx);
 
     // Componentwise deviation.
+    using Real = remove_complex_t<Prec>;
     Real max_err = 0.0;
     for (int i = 0; i < n; i++) {
         Real err = deviation(y[i], x[i]);
@@ -78,6 +77,8 @@ void compare_with_reference_trsv(char uplo, char trans, char diag, int n,
     }
     std::cout << "maximum componentwise error " << max_err << std::endl;
     free(y);
+
+    return max_err;
 }
 
 } // namespace
@@ -93,31 +94,38 @@ int main(int argc, char **argv)
     typedef std::complex<double> prec_t;
     //typedef double prec_t;
 
+    using Real = remove_complex_t<prec_t>;
+    Real max_error = 0.0;
+
     std::vector<prec_t> x = std::vector<prec_t>(maxn);
     std::vector<prec_t> A = std::vector<prec_t>(maxn * ldA);
     int incx = 1;
 
     generator<prec_t> rg;
 
-    for (char uplo : {'U'/*, 'L'*/}) {
-        for (char diag : {'N'/*, 'U'*/}) {
-            for (char trans : {/*'T', */'N'}) {
+    for (char uplo : {'U', 'L'}) {
+        for (char diag : {'N', 'U'}) {
+            for (char trans : {'C', 'T', 'N'}) {
                 for (int n = 0; n < maxn; n++) {
-                    std::cout << "uplo = " << uplo << " , diag = " << diag << " , trans = " << trans << " , n = " << n << std::endl;
+                    std::cout << "uplo = " << uplo << " , diag = " << diag << " , trans = " << trans 
+                              << " , n = " << n << std::endl;
                     // Generate random right-hand side vector, and a triangular matrix.
                     rg.generate_general_matrix(n, 1, x.data(), n);
                     rg.generate_triangular_matrix(uplo, diag, n, A.data(), ldA);
                     //print(n, n, A, ldA, "A = ");
                     //print(n, 1, x, n, "x = ");
 
-                    compare_with_reference_trsv<prec_t>(uplo, trans, diag, n, A.data(), ldA, x.data(), incx);
+                    Real err = compare_with_reference_trsv<prec_t>(
+                        uplo, trans, diag, n, A.data(), ldA, x.data(), incx);
                     //print(n, 1, x, n, "sol = ");
+                    max_error = std::max(err, max_error);
 
                     std::cout << std::endl << std::endl;
                 }
             }
         }
     }
+    std::cout << "Maximum componentwise error across all tests: " << max_error << std::endl;
 
     return EXIT_SUCCESS;
 }
