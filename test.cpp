@@ -6,6 +6,7 @@
 
 #include "generator.hpp"
 #include "template_utils.hpp"
+#include "trsv.hpp"
 
 extern "C" {
     // reference-LAPACK
@@ -66,7 +67,8 @@ void compare_with_reference_trsv(char uplo, char trans, char diag, int n,
         __builtin_unreachable();
     }
 
-    // TODO: Compute trsv with y.
+    // Optimized routine
+    trsv<Prec>(uplo, trans, diag, n, A, ldA, y, incx);
 
     // Componentwise deviation.
     Real max_err = 0.0;
