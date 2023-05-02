@@ -69,6 +69,25 @@ inline double _Complex *to_dcmplx(std::complex<double> *x) {
 inline const double _Complex *to_dcmplx(const std::complex<double> *x) {
     return reinterpret_cast<const double _Complex *>(x);
 }
+
+////
+
+inline float conj(float x) {
+    return x;
+}
+
+inline double conj(double x) {
+    return x;
+}
+
+inline std::complex<float> conj(std::complex<float> x) {
+    return std::conj(x);
+}
+
+inline std::complex<double> conj(std::complex<double> x) {
+    return std::conj(x);
+}
+
 ////
 
 template <typename T>

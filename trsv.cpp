@@ -33,6 +33,27 @@ enum diag_t {
     NOUNIT = 1
 };
 
+enum conj_t {
+    CONJ   = 0,
+    NOCONJ = 1
+};
+
+template<typename Prec, conj_t noconj>
+constexpr Prec conjg(Prec x) {
+    if constexpr (is_floating_point_value<Prec>) {
+        return x;
+    }
+    else {
+        if constexpr (noconj) {
+            return x;
+        }
+        else {
+            return conj(x);
+        }
+    }
+}
+
+
 template <typename Prec>
 inline __attribute__((always_inline))
 int check_param(char uplo, char trans, char diag, int n, int ldA, int incx)
@@ -90,7 +111,6 @@ int check_param(char uplo, char trans, char diag, int n, int ldA, int incx)
 
 } // namespace
 
-
 // upper, notrans
 template<typename Prec, diag_t nounit>
 void trsv_un(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
@@ -105,7 +125,6 @@ void trsv_un(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
         }
     }
 }
-
 
 
 // lower, notrans
@@ -124,6 +143,33 @@ void trsv_ln(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
 }
 
 
+// upper, transpose/conjugate transpose
+template<typename Prec, diag_t nounit, conj_t noconj>
+void trsv_ut(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < j; i++) {
+            x[j] = x[j] - conjg<Prec, noconj>(A[i + j * ldA]) * x[i];
+        }
+        if constexpr (nounit) {
+            x[j] = x[j] / conjg<Prec, noconj>(A[j + ldA * j]);
+        }
+    }
+}
+
+// lower, transpose/conjugate transpose
+template<typename Prec, diag_t nounit, conj_t noconj>
+void trsv_lt(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    for (int j = n-1; j >= 0; j--) {
+        for (int i = n-1; i > j; i--) {
+            x[j] = x[j] - conjg<Prec, noconj>(A[i + j * ldA]) * x[i];
+        }
+        if constexpr (nounit) {
+            x[j] = x[j] / conjg<Prec, noconj>(A[j + ldA * j]);
+        }
+    }
+}
 
 
 template<typename Prec>
@@ -162,7 +208,64 @@ void trsv(char uplo, char trans, char diag, int n,
         }
         else {
             // A**T*x = b or A**H*x = b
-
+            if (upper) {
+                if constexpr (is_floating_point_value<Prec>) {
+                    if (unit) {
+                        trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                    }
+                    else {
+                        trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                    }
+                }
+                else {
+                    bool noconj = (trans == 'T' || trans == 't');
+                    if (noconj) {
+                        if (unit) {
+                            trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                        }
+                        else {
+                            trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                        }
+                    }
+                    else {
+                        if (unit) {
+                            trsv_ut<Prec, UNIT, CONJ>(n, A, ldA, x);
+                        }
+                        else {
+                            trsv_ut<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                        }
+                    }
+                }
+            }
+            else { // lower
+                if constexpr (is_floating_point_value<Prec>) {
+                    if (unit) {
+                        trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                    }
+                    else {
+                        trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                    }
+                }
+                else {
+                    bool noconj = (trans == 'T' || trans == 't');
+                    if (noconj) {
+                        if (unit) {
+                            trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                        }
+                        else {
+                            trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                        }
+                    }
+                    else {
+                        if (unit) {
+                            trsv_lt<Prec, UNIT, CONJ>(n, A, ldA, x);
+                        }
+                        else {
+                            trsv_lt<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                        }
+                    }
+                }
+            }
         }
     }
     else { // incx != 1
