@@ -126,6 +126,37 @@ void trsv_un(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
     }
 }
 
+template<typename Prec, diag_t nounit>
+void trsv_un_unroll2(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    // If necessary, do a single iteration to make n even.
+    if (n % 2 == 1) {
+        if constexpr (nounit) {
+            x[n-1] = x[n-1] / A(n-1,n-1);
+        }
+        for (int i = n-2; i >= 0; i--) {
+            x[i] = x[i] - A(i, n-1) * x[n-1];
+        }
+
+        n = n - 1;
+    }
+
+    // At this point, n is even.
+    for (int j = n-1; j >= 0; j-=2) {
+        if constexpr (nounit) {
+            x[j] = x[j] / A(j,j);
+        }
+        x[j-1] = x[j-1] - A(j-1,j) * x[j];
+        if constexpr (nounit) {
+            x[j-1] = x[j-1] / A(j-1,j-1);
+        }
+
+        for (int i = j-2; i >= 0; i--) {
+            x[i] = x[i] - A(i,j) * x[j] - A(i,j-1) * x[j-1];
+        }
+    }
+}
+
 
 // lower, notrans
 template<typename Prec, diag_t nounit>
@@ -138,6 +169,38 @@ void trsv_ln(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
 
         for (int i = j + 1; i < n; i++) {
             x[i] = x[i] - A[i + j * ldA] * x[j];
+        }
+    }
+}
+
+template<typename Prec, diag_t nounit>
+void trsv_ln_unroll2(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    // If necessary, do a single iteration to make the iteration count even.
+    int j = 0;
+    if (n % 2 == 1) {
+        if constexpr (nounit) {
+            x[0] = x[0] / A(0,0);
+        }
+        for (int i = 1; i < n; i++) {
+            x[i] = x[i] - A(i, 0) * x[0];
+        }
+
+        j++;
+    }
+
+    // At this point, an even number of iteration is needed.
+    for (j; j < n; j+=2) {
+        if constexpr (nounit) {
+            x[j] = x[j] / A[j + ldA * j];
+        }
+        x[j+1] = x[j+1] - A(j+1, j) * x[j];
+        if constexpr (nounit) {
+            x[j+1] = x[j+1] / A(j+1,j+1);
+        }
+
+        for (int i = j+2; i < n; i++) {
+            x[i] = x[i] - A(i,j) * x[j] - A(i,j+1) * x[j+1];
         }
     }
 }
@@ -191,18 +254,22 @@ void trsv(char uplo, char trans, char diag, int n,
             // A*x = b
             if (upper) {
                 if (unit) {
-                    trsv_un<Prec, UNIT>(n, A, ldA, x);
+                    //trsv_un<Prec, UNIT>(n, A, ldA, x);
+                    trsv_un_unroll2<Prec, UNIT>(n, A, ldA, x);
                 }
                 else {
-                    trsv_un<Prec, NOUNIT>(n, A, ldA, x);
+                    //trsv_un<Prec, NOUNIT>(n, A, ldA, x);
+                    trsv_un_unroll2<Prec, NOUNIT>(n, A, ldA, x);
                 }
             }
             else { // lower
                 if (unit) {
-                    trsv_ln<Prec, UNIT>(n, A, ldA, x);
+                    //trsv_ln<Prec, UNIT>(n, A, ldA, x);
+                    trsv_ln_unroll2<Prec, UNIT>(n, A, ldA, x);
                 }
                 else {
-                    trsv_ln<Prec, NOUNIT>(n, A, ldA, x);
+                    //trsv_ln<Prec, NOUNIT>(n, A, ldA, x);
+                    trsv_ln_unroll2<Prec, NOUNIT>(n, A, ldA, x);
                 }
             }
         }
