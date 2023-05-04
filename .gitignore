@@ -1,0 +1,10 @@
+# C/C++ build outputs
+.build/
+build/
+
+# Compiled Object files
+*.o
+
+# Executables
+bench
+test
