@@ -220,6 +220,38 @@ void trsv_ut(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
     }
 }
 
+template<typename Prec, diag_t nounit, conj_t noconj>
+void trsv_ut_unroll_2(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    // If necessary, do a single iteration at the end to make the iteration count even.
+    int last = (n % 2 == 0) ? n : n-1;
+
+    // Execute an even number of iterations.
+    for (int j = 0; j < last; j+=2) {
+        for (int i = 0; i < j; i++) {
+            x[j] = x[j] - conjg<Prec, noconj>(A(i,j)) * x[i];
+            x[j+1] = x[j+1] - conjg<Prec, noconj>(A(i,j+1)) * x[i];
+        }
+        if constexpr (nounit) {
+            x[j] = x[j] / conjg<Prec, noconj>(A(j,j));
+        }
+        x[j+1] = x[j+1] - conjg<Prec, noconj>(A(j,j+1)) * x[j];
+        if constexpr (nounit) {
+            x[j+1] = x[j+1] / conjg<Prec, noconj>(A(j+1,j+1));
+        }
+    }
+
+    // Tail.
+    if (last < n) {
+        for (int i = 0; i < n-1; i++) {
+            x[n-1] = x[n-1] - conjg<Prec, noconj>(A(i,n-1)) * x[i];
+        }
+        if constexpr (nounit) {
+            x[n-1] = x[n-1] / conjg<Prec, noconj>(A(n-1,n-1));
+        }
+    }
+}
+
 // lower, transpose/conjugate transpose
 template<typename Prec, diag_t nounit, conj_t noconj>
 void trsv_lt(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
@@ -230,6 +262,38 @@ void trsv_lt(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
         }
         if constexpr (nounit) {
             x[j] = x[j] / conjg<Prec, noconj>(A[j + ldA * j]);
+        }
+    }
+}
+
+template<typename Prec, diag_t nounit, conj_t noconj>
+void trsv_lt_unroll2(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    // If necessary, do a single iteration at the end to make the iteration count even.
+    int last = (n % 2 == 0) ? 0 : 1;
+
+    for (int j = n-1; j >= last; j-=2) {
+        for (int i = n-1; i > j; i--) {
+            x[j] = x[j] - conjg<Prec, noconj>(A(i,j)) * x[i];
+            x[j-1] = x[j-1] - conjg<Prec, noconj>(A(i,j-1)) * x[i];
+        }
+        if constexpr (nounit) {
+            x[j] = x[j] / conjg<Prec, noconj>(A(j,j));
+        }
+
+        x[j-1] = x[j-1] - conjg<Prec, noconj>(A(j,j-1)) * x[j];
+        if constexpr (nounit) {
+            x[j-1] = x[j-1] / conjg<Prec, noconj>(A(j-1,j-1));
+        }
+    }
+
+    // Tail.
+    if (last != 0) {
+        for (int i = n-1; i > 0; i--) {
+            x[0] = x[0] - conjg<Prec, noconj>(A(i,0)) * x[i];
+        }
+        if constexpr (nounit) {
+            x[0] = x[0] / conjg<Prec, noconj>(A(0,0));
         }
     }
 }
@@ -278,28 +342,34 @@ void trsv(char uplo, char trans, char diag, int n,
             if (upper) {
                 if constexpr (is_floating_point_value<Prec>) {
                     if (unit) {
-                        trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                        //trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                        trsv_ut_unroll_2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
                     }
                     else {
-                        trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                        //trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                        trsv_ut_unroll_2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
                     }
                 }
                 else {
                     bool noconj = (trans == 'T' || trans == 't');
                     if (noconj) {
                         if (unit) {
-                            trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            //trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            trsv_ut_unroll_2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
                         }
                         else {
-                            trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            //trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            trsv_ut_unroll_2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
                         }
                     }
                     else {
                         if (unit) {
-                            trsv_ut<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            //trsv_ut<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            trsv_ut_unroll_2<Prec, UNIT, CONJ>(n, A, ldA, x);
                         }
                         else {
-                            trsv_ut<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            //trsv_ut<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            trsv_ut_unroll_2<Prec, NOUNIT, CONJ>(n, A, ldA, x);
                         }
                     }
                 }
@@ -317,18 +387,22 @@ void trsv(char uplo, char trans, char diag, int n,
                     bool noconj = (trans == 'T' || trans == 't');
                     if (noconj) {
                         if (unit) {
-                            trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            //trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            trsv_lt_unroll2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
                         }
                         else {
-                            trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            //trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            trsv_lt_unroll2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
                         }
                     }
                     else {
                         if (unit) {
-                            trsv_lt<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            //trsv_lt<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            trsv_lt_unroll2<Prec, UNIT, CONJ>(n, A, ldA, x);
                         }
                         else {
-                            trsv_lt<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            //trsv_lt<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            trsv_lt_unroll2<Prec, NOUNIT, CONJ>(n, A, ldA, x);
                         }
                     }
                 }
