@@ -87,7 +87,6 @@ int check_param(char uplo, char trans, char diag, int n, int ldA, int incx)
     }
 
     if (info != 0) {
-        const char *form = "";
         if constexpr (std::is_same_v<Prec, float>) {
             const char *rout = "STRSV";
             xerbla(rout, &info);
@@ -117,11 +116,11 @@ void trsv_un(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
 {
     for (int j = n-1; j >= 0; j--) {
         if constexpr (nounit) {
-            x[j] = x[j] / A[j + ldA * j];
+            x[j] = x[j] / A(j,j);
         }
 
         for (int i = j-1; i >= 0; i--) {
-            x[i] = x[i] - A[i + j * ldA] * x[j];
+            x[i] = x[i] - A(i,j) * x[j];
         }
     }
 }
@@ -164,11 +163,11 @@ void trsv_ln(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
 {
     for (int j = 0; j < n; j++) {
         if constexpr (nounit) {
-            x[j] = x[j] / A[j + ldA * j];
+            x[j] = x[j] / A(j,j);
         }
 
         for (int i = j + 1; i < n; i++) {
-            x[i] = x[i] - A[i + j * ldA] * x[j];
+            x[i] = x[i] - A(i,j) * x[j];
         }
     }
 }
@@ -183,18 +182,18 @@ void trsv_ln_unroll2(int n, const Prec *__restrict__ A, int ldA, Prec *__restric
             x[0] = x[0] / A(0,0);
         }
         for (int i = 1; i < n; i++) {
-            x[i] = x[i] - A(i, 0) * x[0];
+            x[i] = x[i] - A(i,0) * x[0];
         }
 
         j++;
     }
 
     // At this point, an even number of iteration is needed.
-    for (j; j < n; j+=2) {
+    for (; j < n; j+=2) {
         if constexpr (nounit) {
-            x[j] = x[j] / A[j + ldA * j];
+            x[j] = x[j] / A(j,j);
         }
-        x[j+1] = x[j+1] - A(j+1, j) * x[j];
+        x[j+1] = x[j+1] - A(j+1,j) * x[j];
         if constexpr (nounit) {
             x[j+1] = x[j+1] / A(j+1,j+1);
         }
@@ -212,10 +211,10 @@ void trsv_ut(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
 {
     for (int j = 0; j < n; j++) {
         for (int i = 0; i < j; i++) {
-            x[j] = x[j] - conjg<Prec, noconj>(A[i + j * ldA]) * x[i];
+            x[j] = x[j] - conjg<Prec, noconj>(A(i,j)) * x[i];
         }
         if constexpr (nounit) {
-            x[j] = x[j] / conjg<Prec, noconj>(A[j + ldA * j]);
+            x[j] = x[j] / conjg<Prec, noconj>(A(j,j));
         }
     }
 }
@@ -258,10 +257,10 @@ void trsv_lt(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
 {
     for (int j = n-1; j >= 0; j--) {
         for (int i = n-1; i > j; i--) {
-            x[j] = x[j] - conjg<Prec, noconj>(A[i + j * ldA]) * x[i];
+            x[j] = x[j] - conjg<Prec, noconj>(A(i,j)) * x[i];
         }
         if constexpr (nounit) {
-            x[j] = x[j] / conjg<Prec, noconj>(A[j + ldA * j]);
+            x[j] = x[j] / conjg<Prec, noconj>(A(j,j));
         }
     }
 }
