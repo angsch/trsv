@@ -20,6 +20,37 @@ extern "C" {
     #define xerbla(...) xerbla_(__VA_ARGS__)
 #endif
 
+extern "C" {
+    void saxpy_(int *n, const float *alpha, const float *x, int *incx, float *y, int *incy);
+    void daxpy_(int *n, const double *alpha, const double *x, int *incx, double *y, int *incy);
+    void caxpy_(int *n, const float _Complex *alpha, const float _Complex *x, int *incx, float _Complex *y, int *incy);
+    void zaxpy_(int *n, const double _Complex *alpha, const double _Complex *x, int *incx, double _Complex *y, int *incy);
+}
+
+template<typename Prec>
+inline void axpy(int n, const Prec alpha, const Prec *__restrict__ x, int incx, Prec *__restrict__ y, int incy)
+{
+    if constexpr (std::is_same_v<Prec, float>) {
+        saxpy_(&n, &alpha, x, &incx, y, &incy);
+    }
+    else if constexpr (std::is_same_v<Prec, double>) {
+        daxpy_(&n, &alpha, x, &incx, y, &incy);
+    }
+    else if constexpr (std::is_same_v<Prec, std::complex<float>>) {
+        caxpy_(&n, reinterpret_cast<const __complex__ float*>(&alpha),
+               reinterpret_cast<const __complex__ float*>(x), &incx,
+               reinterpret_cast<__complex__ float*>(y), &incy);
+    }
+    else if constexpr (std::is_same_v<Prec, std::complex<double>>) {
+        zaxpy_(&n, reinterpret_cast<const __complex__ double*>(&alpha),
+               reinterpret_cast<const __complex__ double*>(x), &incx,
+               reinterpret_cast<__complex__ double*>(y), &incy);
+    }
+    else {
+        __builtin_unreachable();
+    }
+}
+
 
 #define A(i,j) A[(size_t)(i) + (size_t)ldA*(j)]
 
@@ -156,6 +187,20 @@ void trsv_un_unroll2(int n, const Prec *__restrict__ A, int ldA, Prec *__restric
     }
 }
 
+template<typename Prec, diag_t nounit>
+void trsv_un_axpy(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    for (int j = n-1; j >= 0; j--) {
+        if constexpr (nounit) {
+            x[j] = x[j] / A(j,j);
+        }
+
+        // x(0:j-1) -= A(0:j-1,j) * x[j]
+        axpy<Prec>(j, -x[j], &A(0,j), 1, x, 1);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 // lower, notrans
 template<typename Prec, diag_t nounit>
@@ -204,6 +249,20 @@ void trsv_ln_unroll2(int n, const Prec *__restrict__ A, int ldA, Prec *__restric
     }
 }
 
+template<typename Prec, diag_t nounit>
+void trsv_ln_axpy(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    for (int j = 0; j < n; j++) {
+        if constexpr (nounit) {
+            x[j] = x[j] / A(j,j);
+        }
+
+        // x(j+1:n) -= A(j+1:n,j)*x[j]
+        axpy<Prec>(n-(j+1), -x[j], &A(j+1,j), 1, &x[j+1], 1);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 // upper, transpose/conjugate transpose
 template<typename Prec, diag_t nounit, conj_t noconj>
@@ -318,11 +377,11 @@ void trsv(char uplo, char trans, char diag, int n,
             if (upper) {
                 if (unit) {
                     //trsv_un<Prec, UNIT>(n, A, ldA, x);
-                    trsv_un_unroll2<Prec, UNIT>(n, A, ldA, x);
+                    /*trsv_un_unroll2*/trsv_un_axpy<Prec, UNIT>(n, A, ldA, x);
                 }
                 else {
                     //trsv_un<Prec, NOUNIT>(n, A, ldA, x);
-                    trsv_un_unroll2<Prec, NOUNIT>(n, A, ldA, x);
+                    /*trsv_un_unroll2*/trsv_un_axpy<Prec, NOUNIT>(n, A, ldA, x);
                 }
             }
             else { // lower
