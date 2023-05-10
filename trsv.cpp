@@ -21,6 +21,23 @@ extern "C" {
     #define xerbla(...) xerbla_(__VA_ARGS__)
 #endif
 
+#define A(i,j) A[(size_t)(i) + (size_t)ldA*(j)]
+
+enum uplo_t {
+    UPPER = 0,
+    LOWER = 1
+};
+
+enum diag_t {
+    UNIT   = 0,
+    NOUNIT = 1
+};
+
+enum conj_t {
+    CONJ   = 0,
+    NOCONJ = 1
+};
+
 
 template<typename Prec>
 inline void axpy(int n, const Prec alpha, const Prec *__restrict__ x, int incx, Prec *__restrict__ y, int incy)
@@ -42,23 +59,43 @@ inline void axpy(int n, const Prec alpha, const Prec *__restrict__ x, int incx, 
     }
 }
 
-
-#define A(i,j) A[(size_t)(i) + (size_t)ldA*(j)]
-
-enum uplo_t {
-    UPPER = 0,
-    LOWER = 1
-};
-
-enum diag_t {
-    UNIT   = 0,
-    NOUNIT = 1
-};
-
-enum conj_t {
-    CONJ   = 0,
-    NOCONJ = 1
-};
+template<typename Prec, conj_t noconj>
+inline Prec dot(int n, const Prec *__restrict__ x, int incx, Prec *__restrict__ y, int incy)
+{
+    if constexpr (std::is_same_v<Prec, float>) {
+        return cblas_sdot(n, x, incx, y, incy);
+    }
+    else if constexpr (std::is_same_v<Prec, double>) {
+        return cblas_ddot(n, x, incx, y, incy);
+    }
+    else if constexpr (std::is_same_v<Prec, std::complex<float>>) {
+        Prec cdot = Prec(0.0);
+        if constexpr (noconj) {
+            // x**T * y
+            cblas_cdotu_sub(n, to_fcmplx(x), incx, to_fcmplx(y), incy, to_fcmplx(&cdot));
+        }
+        else {
+            // x**H * y
+            cblas_cdotc_sub(n, to_fcmplx(x), incx, to_fcmplx(y), incy, to_fcmplx(&cdot));
+        }
+        return cdot;
+    }
+    else if constexpr (std::is_same_v<Prec, std::complex<double>>) {
+        Prec zdot = Prec(0.0);
+        if constexpr (noconj) {
+            // x**T * y
+            cblas_zdotu_sub(n, to_dcmplx(x), incx, to_dcmplx(y), incy, to_dcmplx(&zdot));
+        }
+        else {
+            // x**H * y
+            cblas_zdotc_sub(n, to_dcmplx(x), incx, to_dcmplx(y), incy, to_dcmplx(&zdot));
+        }
+        return zdot;
+    }
+    else {
+        __builtin_unreachable();
+    }
+}
 
 template<typename Prec, conj_t noconj>
 constexpr Prec conjg(Prec x) {
@@ -301,6 +338,21 @@ void trsv_ut_unroll_2(int n, const Prec *__restrict__ A, int ldA, Prec *__restri
     }
 }
 
+template<typename Prec, diag_t nounit, conj_t noconj>
+void trsv_ut_dot(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    for (int j = 0; j < n; j++) {
+        // x[j] -= A(0:j-1,j)**{T,H} * x(0:j-1)
+        x[j] = x[j] - dot<Prec, noconj>(j, &A(0,j), 1, x, 1);
+
+        if constexpr (nounit) {
+            x[j] = x[j] / conjg<Prec, noconj>(A(j,j));
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 // lower, transpose/conjugate transpose
 template<typename Prec, diag_t nounit, conj_t noconj>
 void trsv_lt(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
@@ -347,6 +399,20 @@ void trsv_lt_unroll2(int n, const Prec *__restrict__ A, int ldA, Prec *__restric
     }
 }
 
+template<typename Prec, diag_t nounit, conj_t noconj>
+void trsv_lt_dot(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+{
+    for (int j = n-1; j >= 0; j--) {
+        // x[j] -= A(j+1:n-1,j)**{T,H} * x(0:j-1)
+        x[j] = x[j] - dot<Prec, noconj>(n-j-1, &A(j+1,j), 1, &x[j+1], 1);
+
+        if constexpr (nounit) {
+            x[j] = x[j] / conjg<Prec, noconj>(A(j,j));
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 template<typename Prec>
 void trsv(char uplo, char trans, char diag, int n,
@@ -403,18 +469,18 @@ void trsv(char uplo, char trans, char diag, int n,
                     bool noconj = (trans == 'T' || trans == 't');
                     if (noconj) {
                         if (unit) {
-                            //trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
-                            trsv_ut_unroll_2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            /*trsv_ut*/trsv_ut_dot<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            //trsv_ut_unroll_2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
                         }
                         else {
-                            //trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
-                            trsv_ut_unroll_2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            /*trsv_ut*/trsv_ut_dot<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            //trsv_ut_unroll_2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
                         }
                     }
                     else {
                         if (unit) {
-                            //trsv_ut<Prec, UNIT, CONJ>(n, A, ldA, x);
-                            trsv_ut_unroll_2<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            /*trsv_ut*/trsv_ut_dot<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            //trsv_ut_unroll_2<Prec, UNIT, CONJ>(n, A, ldA, x);
                         }
                         else {
                             //trsv_ut<Prec, NOUNIT, CONJ>(n, A, ldA, x);
@@ -426,22 +492,22 @@ void trsv(char uplo, char trans, char diag, int n,
             else { // lower
                 if constexpr (is_floating_point_value<Prec>) {
                     if (unit) {
-                        trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                        /*trsv_lt*/trsv_lt_dot<Prec, UNIT, NOCONJ>(n, A, ldA, x);
                     }
                     else {
-                        trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                        /*trsv_lt*/trsv_lt_dot<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
                     }
                 }
                 else {
                     bool noconj = (trans == 'T' || trans == 't');
                     if (noconj) {
                         if (unit) {
-                            //trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
-                            trsv_lt_unroll2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            /*trsv_lt*/trsv_lt_dot<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            //trsv_lt_unroll2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
                         }
                         else {
-                            //trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
-                            trsv_lt_unroll2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            /*trsv_lt*/trsv_lt_dot<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            //trsv_lt_unroll2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
                         }
                     }
                     else {
