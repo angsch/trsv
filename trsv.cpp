@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include "cblas.h"
 
 namespace {
 extern "C" {
@@ -20,31 +21,21 @@ extern "C" {
     #define xerbla(...) xerbla_(__VA_ARGS__)
 #endif
 
-extern "C" {
-    void saxpy_(int *n, const float *alpha, const float *x, int *incx, float *y, int *incy);
-    void daxpy_(int *n, const double *alpha, const double *x, int *incx, double *y, int *incy);
-    void caxpy_(int *n, const float _Complex *alpha, const float _Complex *x, int *incx, float _Complex *y, int *incy);
-    void zaxpy_(int *n, const double _Complex *alpha, const double _Complex *x, int *incx, double _Complex *y, int *incy);
-}
 
 template<typename Prec>
 inline void axpy(int n, const Prec alpha, const Prec *__restrict__ x, int incx, Prec *__restrict__ y, int incy)
 {
     if constexpr (std::is_same_v<Prec, float>) {
-        saxpy_(&n, &alpha, x, &incx, y, &incy);
+        cblas_saxpy(n, alpha, x, incx, y, incy);
     }
     else if constexpr (std::is_same_v<Prec, double>) {
-        daxpy_(&n, &alpha, x, &incx, y, &incy);
+        cblas_daxpy(n, alpha, x, incx, y, incy);
     }
     else if constexpr (std::is_same_v<Prec, std::complex<float>>) {
-        caxpy_(&n, reinterpret_cast<const __complex__ float*>(&alpha),
-               reinterpret_cast<const __complex__ float*>(x), &incx,
-               reinterpret_cast<__complex__ float*>(y), &incy);
+        cblas_caxpy(n, to_fcmplx(&alpha), to_fcmplx(x), incx, to_fcmplx(y), incy);
     }
     else if constexpr (std::is_same_v<Prec, std::complex<double>>) {
-        zaxpy_(&n, reinterpret_cast<const __complex__ double*>(&alpha),
-               reinterpret_cast<const __complex__ double*>(x), &incx,
-               reinterpret_cast<__complex__ double*>(y), &incy);
+        cblas_zaxpy(n, to_dcmplx(&alpha), to_dcmplx(x), incx, to_dcmplx(y), incy);
     }
     else {
         __builtin_unreachable();
@@ -387,11 +378,11 @@ void trsv(char uplo, char trans, char diag, int n,
             else { // lower
                 if (unit) {
                     //trsv_ln<Prec, UNIT>(n, A, ldA, x);
-                    trsv_ln_unroll2<Prec, UNIT>(n, A, ldA, x);
+                    /*trsv_ln_unroll2*/trsv_ln_axpy<Prec, UNIT>(n, A, ldA, x);
                 }
                 else {
                     //trsv_ln<Prec, NOUNIT>(n, A, ldA, x);
-                    trsv_ln_unroll2<Prec, NOUNIT>(n, A, ldA, x);
+                    /*trsv_ln_unroll2*/trsv_ln_axpy<Prec, NOUNIT>(n, A, ldA, x);
                 }
             }
         }
@@ -470,7 +461,6 @@ void trsv(char uplo, char trans, char diag, int n,
     else { // incx != 1
         // TODO: slow reference
     }
-
 }
 
 template
