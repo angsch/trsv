@@ -2,6 +2,7 @@
 #include <complex>
 #include <initializer_list>
 #include <iostream>
+#include <string_view>
 #include <vector>
 
 #include "generator.hpp"
@@ -17,6 +18,15 @@ extern "C" {
 }
 
 namespace {
+
+template<typename Prec>
+constexpr std::string_view print_prec() {
+    if constexpr (std::is_same_v<Prec, double>) return "double";
+    else if constexpr (std::is_same_v<Prec, float>) return "float";
+    else if constexpr (std::is_same_v<Prec, std::complex<float>>) return "single complex";
+    else if constexpr (std::is_same_v<Prec, std::complex<double>>) return "double complex";
+    else __builtin_unreachable();
+}
 
 template <typename Prec>
 inline __attribute__((always_inline))
@@ -75,57 +85,70 @@ remove_complex_t<Prec> compare_with_reference_trsv(char uplo, char trans, char d
         Real err = deviation(y[i], x[i]);
         max_err = std::max(max_err, err);
     }
-    std::cout << "maximum componentwise error " << max_err << std::endl;
     free(y);
 
     return max_err;
 }
 
-} // namespace
+template<typename Prec>
+void test(bool verbose) {
+    using Real = remove_complex_t<Prec>;
 
-
-using namespace std::chrono;
-
-int main(int argc, char **argv)
-{
     constexpr int maxn = 10;
     int ldA = maxn;
 
-    typedef std::complex<double> prec_t;
-    //typedef double prec_t;
-
-    using Real = remove_complex_t<prec_t>;
     Real max_error = 0.0;
-
-    std::vector<prec_t> x = std::vector<prec_t>(maxn);
-    std::vector<prec_t> A = std::vector<prec_t>(maxn * ldA);
+    std::vector<Prec> x = std::vector<Prec>(maxn);
+    std::vector<Prec> A = std::vector<Prec>(maxn * ldA);
     int incx = 1;
 
-    generator<prec_t> rg;
+    generator<Prec> rg;
+
+    std::cout << "===================" << std::endl;
+    std::cout << "Testing " << print_prec<Prec>() << std::endl;
+    std::cout << "===================" << std::endl;
 
     for (char uplo : {'U', 'L'}) {
         for (char diag : {'N', 'U'}) {
             for (char trans : {'C', 'T', 'N'}) {
                 for (int n = 0; n < maxn; n++) {
-                    std::cout << "uplo = " << uplo << " , diag = " << diag << " , trans = " << trans 
-                              << " , n = " << n << std::endl;
+                    if (verbose) {
+                        std::cout << "uplo = " << uplo << " , diag = " << diag << " , trans = " 
+                                  << trans << " , n = " << n << std::endl;
+                    }
                     // Generate random right-hand side vector, and a triangular matrix.
                     rg.generate_general_matrix(n, 1, x.data(), n);
                     rg.generate_triangular_matrix(uplo, diag, n, A.data(), ldA);
                     //print(n, n, A, ldA, "A = ");
                     //print(n, 1, x, n, "x = ");
 
-                    Real err = compare_with_reference_trsv<prec_t>(
+                    Real err = compare_with_reference_trsv<Prec>(
                         uplo, trans, diag, n, A.data(), ldA, x.data(), incx);
                     //print(n, 1, x, n, "sol = ");
-                    max_error = std::max(err, max_error);
+                    
+                    if (verbose) {
+                        std::cout << "maximum componentwise error " << err 
+                                  << std::endl << std::endl;
+                    }
 
-                    std::cout << std::endl << std::endl;
+                    max_error = std::max(err, max_error);
                 }
             }
         }
     }
-    std::cout << "Maximum componentwise error across all tests: " << max_error << std::endl;
+    std::cout << "Maximum componentwise error across all tests: " << max_error << std::endl << std::endl;
+}
+
+} // namespace
+
+
+int main(int argc, char **argv)
+{
+    bool verbose = false;
+    test<float>(verbose);
+    test<double>(verbose);
+    test<std::complex<double>>(verbose);
+    test<std::complex<float>>(verbose);
 
     return EXIT_SUCCESS;
 }
