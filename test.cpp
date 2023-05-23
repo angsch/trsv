@@ -2,7 +2,6 @@
 #include <complex>
 #include <initializer_list>
 #include <iostream>
-#include <string_view>
 #include <vector>
 
 #include "generator.hpp"
@@ -18,15 +17,6 @@ extern "C" {
 }
 
 namespace {
-
-template<typename Prec>
-constexpr std::string_view print_prec() {
-    if constexpr (std::is_same_v<Prec, double>) return "double";
-    else if constexpr (std::is_same_v<Prec, float>) return "float";
-    else if constexpr (std::is_same_v<Prec, std::complex<float>>) return "single complex";
-    else if constexpr (std::is_same_v<Prec, std::complex<double>>) return "double complex";
-    else __builtin_unreachable();
-}
 
 template <typename Prec>
 inline __attribute__((always_inline))
@@ -62,14 +52,10 @@ remove_complex_t<Prec> compare_with_reference_trsv(char uplo, char trans, char d
         strsv_(&uplo, &trans, &diag, &n, A, &ldA, x, &incx);
     }
     else if constexpr (std::is_same_v<Prec, std::complex<float>>) {
-        ctrsv_(&uplo, &trans, &diag, &n,
-               reinterpret_cast<const __complex__ float*>(A), &ldA,
-               reinterpret_cast<__complex__ float*>(x), &incx);
+        ctrsv_(&uplo, &trans, &diag, &n, to_fcmplx(A), &ldA, to_fcmplx(x), &incx);
     }
     else if constexpr (std::is_same_v<Prec, std::complex<double>>) {
-        ztrsv_(&uplo, &trans, &diag, &n,
-               reinterpret_cast<const __complex__ double*>(A), &ldA,
-               reinterpret_cast<__complex__ double*>(x), &incx);
+        ztrsv_(&uplo, &trans, &diag, &n, to_dcmplx(A), &ldA, to_dcmplx(x), &incx);
     }
     else {
         __builtin_unreachable();
@@ -91,7 +77,8 @@ remove_complex_t<Prec> compare_with_reference_trsv(char uplo, char trans, char d
 }
 
 template<typename Prec>
-void test(bool verbose) {
+void test(bool verbose)
+{
     using Real = remove_complex_t<Prec>;
 
     constexpr int maxn = 10;
@@ -105,7 +92,7 @@ void test(bool verbose) {
     generator<Prec> rg;
 
     std::cout << "===================" << std::endl;
-    std::cout << "Testing " << print_prec<Prec>() << std::endl;
+    std::cout << "Testing " << prec_to_str<Prec>() << std::endl;
     std::cout << "===================" << std::endl;
 
     for (char uplo : {'U', 'L'}) {

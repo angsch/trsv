@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <optional>
 
 template<typename T>
@@ -89,6 +90,15 @@ inline std::complex<double> conj(std::complex<double> x) {
 }
 
 ////
+
+template<typename Prec>
+inline constexpr std::string_view prec_to_str() {
+    if constexpr (std::is_same_v<Prec, double>) return "double";
+    else if constexpr (std::is_same_v<Prec, float>) return "float";
+    else if constexpr (std::is_same_v<Prec, std::complex<float>>) return "float_complex";
+    else if constexpr (std::is_same_v<Prec, std::complex<double>>) return "double_complex";
+    else __builtin_unreachable();
+}
 
 template <typename T>
 void print(int m, int n, const std::vector<T> &mat, int ld, std::string label = "") {
