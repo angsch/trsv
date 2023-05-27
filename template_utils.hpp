@@ -43,11 +43,12 @@ inline constexpr bool is_complex_value = is_complex_t<T>::value;
 
 template <typename T>
 struct remove_complex {
-    typedef T type;
+    using type = T;
 };
+
 template <typename T>
 struct remove_complex<std::complex<T>> {
-    typedef T type;
+    using type = T;
 };
 
 template <typename T>

@@ -14,8 +14,8 @@ struct random_engine;
 
 template<typename T>
 struct random_engine<T, std::enable_if_t<is_floating_point_value<remove_complex_t<T>>>> {
-    typedef std::mt19937 gen;
-    typedef std::normal_distribution<remove_complex_t<T>> d;
+    using gen = std::mt19937;
+    using d = std::normal_distribution<remove_complex_t<T>>;
 };
 
 template<typename T>
