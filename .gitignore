@@ -4,7 +4,15 @@ build/
 
 # Compiled Object files
 *.o
+*.gcno
+*.gcda
+*.gcov
 
 # Executables
 bench
 test
+
+# Results
+analysis/coverage-report-bench/
+analysis/coverage-report-test/
+*.pdf

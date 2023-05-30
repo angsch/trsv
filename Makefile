@@ -7,6 +7,12 @@ CXXFLAGS += -std=c++17
 
 OBJS := generator.o trsv.o
 
+# To get coverage reports, cd analysis && ./coverage.sh
+ifeq ($(coverage), 1)
+	CXXFLAGS += --coverage
+	LDFLAGS += --coverage
+endif
+
 all: bench test
 
 test: test.o $(OBJS)
@@ -19,4 +25,4 @@ bench: bench.o $(OBJS)
 	$(CXX) $(CXXFLAGS) $(DEFINES) -c $< -o $@
 
 clean: 
-	rm -f test bench *.o
+	rm -f test bench *.o *.gcda *.gcno *.gcov
