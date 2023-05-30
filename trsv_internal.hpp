@@ -17,8 +17,8 @@ inline std::string kernel_type_to_str(kernel_t kernel_type) {
 }
 
 template<typename Prec, kernel_t kernel_type>
-void trsv_selector(char uplo, char trans, char diag, int n,
-    const Prec *__restrict__ A, int ldA, Prec *__restrict__ x);
+int trsv_selector(char uplo, char trans, char diag, int n,
+    const Prec *__restrict__ A, int ldA, Prec *__restrict__ x, int incx);
 
 template<typename Prec>
 inline long trsv_flops(int n){

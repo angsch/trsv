@@ -116,7 +116,7 @@ constexpr Prec conjg(Prec x) {
 
 template <typename Prec>
 inline __attribute__((always_inline))
-int check_param(char uplo, char trans, char diag, int n, int ldA, int incx)
+int check_param(char uplo, char trans, char diag, int n, int ldA, int incx, bool call_xerbla = true)
 {
     bool upper = (uplo == 'U' || uplo == 'u');
     bool lower = (uplo == 'L' || uplo == 'l');
@@ -146,7 +146,7 @@ int check_param(char uplo, char trans, char diag, int n, int ldA, int incx)
         info = -8;
     }
 
-    if (info != 0) {
+    if (info != 0 && call_xerbla) {
         if constexpr (std::is_same_v<Prec, float>) {
             const char *rout = "STRSV";
             xerbla(rout, &info);
@@ -417,13 +417,14 @@ void trsv_lt_dot(int n, const Prec *__restrict__ A, int ldA, Prec *__restrict__ 
 
 namespace internal {
 template<typename Prec, kernel_t kernel_type>
-void trsv_selector(char uplo, char trans, char diag, int n,
-    const Prec *__restrict__ A, int ldA, Prec *__restrict__ x)
+int trsv_selector(char uplo, char trans, char diag, int n,
+    const Prec *__restrict__ A, int ldA, Prec *__restrict__ x, int incx)
 {
-    int info = check_param<Prec>(uplo, trans, diag, n, ldA, 1);
+    bool call_xerbla = false;
+    int info = check_param<Prec>(uplo, trans, diag, n, ldA, incx, call_xerbla);
     // Quick return if possible.
     if (info != 0 || n == 0) {
-        return;
+        return info;
     }
 
     bool upper = (uplo == 'U' || uplo == 'u');
@@ -558,52 +559,59 @@ void trsv_selector(char uplo, char trans, char diag, int n,
             }
         }
     }
+    return info;
 }
 
 template
-void trsv_selector<double, USE_BLAS_CALL>(char uplo, char trans, char diag, int n, const double *__restrict__ A, int ldA, double *__restrict__ x);
+int trsv_selector<double, USE_BLAS_CALL>(char uplo, char trans, char diag, int n,
+    const double *__restrict__ A, int ldA, double *__restrict__ x, int incx);
 
 template
-void trsv_selector<double, UNROLL_1>(char uplo, char trans, char diag, int n, const double *__restrict__ A, int ldA, double *__restrict__ x);
+int trsv_selector<double, UNROLL_1>(char uplo, char trans, char diag, int n,
+    const double *__restrict__ A, int ldA, double *__restrict__ x, int incx);
 
 template
-void trsv_selector<double, UNROLL_2>(char uplo, char trans, char diag, int n, const double *__restrict__ A, int ldA, double *__restrict__ x);
-
-
-template
-void trsv_selector<float, USE_BLAS_CALL>(char uplo, char trans, char diag, int n, const float *__restrict__ A, int ldA, float *__restrict__ x);
-
-template
-void trsv_selector<float, UNROLL_1>(char uplo, char trans, char diag, int n, const float *__restrict__ A, int ldA, float *__restrict__ x);
-
-template
-void trsv_selector<float, UNROLL_2>(char uplo, char trans, char diag, int n, const float *__restrict__ A, int ldA, float *__restrict__ x);
+int trsv_selector<double, UNROLL_2>(char uplo, char trans, char diag, int n,
+    const double *__restrict__ A, int ldA, double *__restrict__ x, int incx);
 
 
 template
-void trsv_selector<std::complex<float>,USE_BLAS_CALL>(char uplo, char trans, char diag, int n,
-    const std::complex<float> *__restrict__ A, int ldA, std::complex<float> *__restrict__ x);
+int trsv_selector<float, USE_BLAS_CALL>(char uplo, char trans, char diag, int n,
+    const float *__restrict__ A, int ldA, float *__restrict__ x, int incx);
 
 template
-void trsv_selector<std::complex<float>,UNROLL_1>(char uplo, char trans, char diag, int n,
-    const std::complex<float> *__restrict__ A, int ldA, std::complex<float> *__restrict__ x);
+int trsv_selector<float, UNROLL_1>(char uplo, char trans, char diag, int n,
+    const float *__restrict__ A, int ldA, float *__restrict__ x, int incx);
 
 template
-void trsv_selector<std::complex<float>,UNROLL_2>(char uplo, char trans, char diag, int n,
-    const std::complex<float> *__restrict__ A, int ldA, std::complex<float> *__restrict__ x);
+int trsv_selector<float, UNROLL_2>(char uplo, char trans, char diag, int n,
+    const float *__restrict__ A, int ldA, float *__restrict__ x, int incx);
 
 
 template
-void trsv_selector<std::complex<double>,USE_BLAS_CALL>(char uplo, char trans, char diag, int n,
-    const std::complex<double> *__restrict__ A, int ldA, std::complex<double> *__restrict__ x);
+int trsv_selector<std::complex<float>,USE_BLAS_CALL>(char uplo, char trans, char diag, int n,
+    const std::complex<float> *__restrict__ A, int ldA, std::complex<float> *__restrict__ x, int incx);
 
 template
-void trsv_selector<std::complex<double>,UNROLL_1>(char uplo, char trans, char diag, int n,
-    const std::complex<double> *__restrict__ A, int ldA, std::complex<double> *__restrict__ x);
+int trsv_selector<std::complex<float>,UNROLL_1>(char uplo, char trans, char diag, int n,
+    const std::complex<float> *__restrict__ A, int ldA, std::complex<float> *__restrict__ x, int incx);
 
 template
-void trsv_selector<std::complex<double>,UNROLL_2>(char uplo, char trans, char diag, int n,
-    const std::complex<double> *__restrict__ A, int ldA, std::complex<double> *__restrict__ x);
+int trsv_selector<std::complex<float>,UNROLL_2>(char uplo, char trans, char diag, int n,
+    const std::complex<float> *__restrict__ A, int ldA, std::complex<float> *__restrict__ x, int incx);
+
+
+template
+int trsv_selector<std::complex<double>,USE_BLAS_CALL>(char uplo, char trans, char diag, int n,
+    const std::complex<double> *__restrict__ A, int ldA, std::complex<double> *__restrict__ x, int incx);
+
+template
+int trsv_selector<std::complex<double>,UNROLL_1>(char uplo, char trans, char diag, int n,
+    const std::complex<double> *__restrict__ A, int ldA, std::complex<double> *__restrict__ x, int incx);
+
+template
+int trsv_selector<std::complex<double>,UNROLL_2>(char uplo, char trans, char diag, int n,
+    const std::complex<double> *__restrict__ A, int ldA, std::complex<double> *__restrict__ x, int incx);
 
 } // namespace internal
 

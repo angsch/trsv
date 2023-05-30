@@ -7,6 +7,7 @@
 #include "generator.hpp"
 #include "template_utils.hpp"
 #include "trsv.hpp"
+#include "trsv_internal.hpp"
 
 extern "C" {
     // reference-LAPACK
@@ -76,6 +77,45 @@ remove_complex_t<Prec> compare_with_reference_trsv(char uplo, char trans, char d
     return max_err;
 }
 
+inline __attribute__((always_inline))
+int check(int returned, int expected) {
+    if (returned != expected) {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+template<typename Prec>
+void test_error_exits(bool verbose)
+{
+    int (*trsv_var)(char, char, char, int, const Prec *__restrict__ , int,
+        Prec *__restrict__, int);
+    trsv_var = internal::trsv_selector<Prec, internal::UNROLL_1>;
+
+    // Disable xerbla
+
+    Prec A[1] = {Prec(42.0)};
+    Prec x[1] = {Prec(-42.0)};
+
+    int num_err = 0;
+
+    num_err += check(trsv_var('/', 'N', 'U',  1, A, 1, x, 1), -1);
+    num_err += check(trsv_var('U', '/', 'U',  1, A, 1, x, 1), -2);
+    num_err += check(trsv_var('U', 'N', '/',  1, A, 1, x, 1), -3);
+    num_err += check(trsv_var('U', 'N', 'U', -1, A, 1, x, 1), -4);
+    num_err += check(trsv_var('U', 'N', 'U',  1, A, 0, x, 1), -6);
+    num_err += check(trsv_var('U', 'N', 'U',  1, A, 1, x, 0), -8);
+
+    if (num_err > 0) {
+        std::cout << "There are " << num_err << "invalid exits" << std::endl;
+    }
+    else {
+        std::cout << "All error exist tests passed" << std::endl;
+    }
+}
+
 template<typename Prec>
 void test(bool verbose)
 {
@@ -123,7 +163,9 @@ void test(bool verbose)
             }
         }
     }
-    std::cout << "Maximum componentwise error across all tests: " << max_error << std::endl << std::endl;
+    std::cout << "Maximum componentwise error across all tests: " << max_error << std::endl;
+
+    test_error_exits<Prec>(false);
 }
 
 } // namespace

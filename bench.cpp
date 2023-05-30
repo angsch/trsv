@@ -20,14 +20,15 @@ template<typename Prec>
 microseconds bench(kernel_t variant, char uplo, char trans, char diag, int n,
     const Prec *__restrict__ A, int ldA, Prec *__restrict__ x, int incx)
 {
-    void (*trsv_var[])(char, char, char, int, const Prec *__restrict__ , int, Prec *__restrict__) = {
+    int (*trsv_var[])(char, char, char, int, const Prec *__restrict__ , int,
+                      Prec *__restrict__, int) = {
         trsv_selector<Prec, USE_BLAS_CALL>,
         trsv_selector<Prec, UNROLL_1>,
         trsv_selector<Prec, UNROLL_2>
     };
 
     auto time_start = high_resolution_clock::now();
-    trsv_var[variant](uplo, trans, diag, n, A, ldA, x);
+    trsv_var[variant](uplo, trans, diag, n, A, ldA, x, incx);
     auto time_end = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(time_end - time_start);
     std::cout << "  Time elapsed = " << duration.count() << " µs" << std::endl;
