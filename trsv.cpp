@@ -1,8 +1,6 @@
 #include "template_utils.hpp"
 #include "trsv_internal.hpp"
 
-#include <algorithm>
-#include <cassert>
 #include "cblas.h"
 
 namespace {

@@ -64,7 +64,6 @@ void bench(const std::string &output_filename)
         << std::setw(14) << std::left << "duration [µs]"
         << std::endl;
 
-    using Real = remove_complex_t<Prec>;
     constexpr int maxn = 4000;
     int ldA = maxn;
 
