@@ -1,4 +1,3 @@
-#include <chrono>
 #include <complex>
 #include <initializer_list>
 #include <iostream>
@@ -21,7 +20,8 @@ namespace {
 
 template <typename Prec>
 inline __attribute__((always_inline))
-remove_complex_t<Prec> deviation(Prec x, Prec y) {
+remove_complex_t<Prec> deviation(Prec x, Prec y)
+{
     Prec diff = x - y;
     if constexpr (is_complex_value<Prec>) {
         using Real = remove_complex_t<Prec>;
