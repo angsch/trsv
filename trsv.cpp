@@ -431,57 +431,42 @@ int trsv_selector(char uplo, char trans, char diag, int n,
     bool unit = (diag == 'U' || diag == 'u');
     bool notrans = (trans == 'N' || trans == 'n');
 
-    if (notrans) {
-        // A*x = b
-        if (upper) {
-            if (unit) {
-                if      constexpr (kernel_type == UNROLL_1) trsv_un<Prec, UNIT>(n, A, ldA, x);
-                else if constexpr (kernel_type == UNROLL_2) trsv_un_unroll2<Prec, UNIT>(n, A, ldA, x);
-                else if constexpr (kernel_type == USE_BLAS_CALL) trsv_un_axpy<Prec, UNIT>(n, A, ldA, x);
-                else    __builtin_unreachable();
-            }
-            else {
-                if      constexpr (kernel_type == UNROLL_1) trsv_un<Prec, NOUNIT>(n, A, ldA, x);
-                else if constexpr (kernel_type == UNROLL_2) trsv_un_unroll2<Prec, NOUNIT>(n, A, ldA, x);
-                else if constexpr (kernel_type == USE_BLAS_CALL) trsv_un_axpy<Prec, NOUNIT>(n, A, ldA, x);
-                else    __builtin_unreachable();
-            }
-        }
-        else { // lower
-            if (unit) {
-                if      constexpr (kernel_type == UNROLL_1) trsv_ln<Prec, UNIT>(n, A, ldA, x);
-                else if constexpr (kernel_type == UNROLL_2) trsv_ln_unroll2<Prec, UNIT>(n, A, ldA, x);
-                else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ln_axpy<Prec, UNIT>(n, A, ldA, x);
-                else    __builtin_unreachable();
-            }
-            else {
-                if      constexpr (kernel_type == UNROLL_1) trsv_ln<Prec, NOUNIT>(n, A, ldA, x);
-                else if constexpr (kernel_type == UNROLL_2) trsv_ln_unroll2<Prec, NOUNIT>(n, A, ldA, x);
-                else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ln_axpy<Prec, NOUNIT>(n, A, ldA, x);
-                else    __builtin_unreachable();
-            }
-        }
-    }
-    else {
-        // A**T*x = b or A**H*x = b
-        if (upper) {
-            if constexpr (is_floating_point_value<Prec>) {
+    if (incx == 1) {
+        if (notrans) {
+            // A*x = b
+            if (upper) {
                 if (unit) {
-                    if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
-                    else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
-                    else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ut_dot<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                    if      constexpr (kernel_type == UNROLL_1) trsv_un<Prec, UNIT>(n, A, ldA, x);
+                    else if constexpr (kernel_type == UNROLL_2) trsv_un_unroll2<Prec, UNIT>(n, A, ldA, x);
+                    else if constexpr (kernel_type == USE_BLAS_CALL) trsv_un_axpy<Prec, UNIT>(n, A, ldA, x);
                     else    __builtin_unreachable();
                 }
                 else {
-                    if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
-                    else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
-                    else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ut_dot<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                    if      constexpr (kernel_type == UNROLL_1) trsv_un<Prec, NOUNIT>(n, A, ldA, x);
+                    else if constexpr (kernel_type == UNROLL_2) trsv_un_unroll2<Prec, NOUNIT>(n, A, ldA, x);
+                    else if constexpr (kernel_type == USE_BLAS_CALL) trsv_un_axpy<Prec, NOUNIT>(n, A, ldA, x);
                     else    __builtin_unreachable();
                 }
             }
-            else {
-                bool noconj = (trans == 'T' || trans == 't');
-                if (noconj) {
+            else { // lower
+                if (unit) {
+                    if      constexpr (kernel_type == UNROLL_1) trsv_ln<Prec, UNIT>(n, A, ldA, x);
+                    else if constexpr (kernel_type == UNROLL_2) trsv_ln_unroll2<Prec, UNIT>(n, A, ldA, x);
+                    else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ln_axpy<Prec, UNIT>(n, A, ldA, x);
+                    else    __builtin_unreachable();
+                }
+                else {
+                    if      constexpr (kernel_type == UNROLL_1) trsv_ln<Prec, NOUNIT>(n, A, ldA, x);
+                    else if constexpr (kernel_type == UNROLL_2) trsv_ln_unroll2<Prec, NOUNIT>(n, A, ldA, x);
+                    else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ln_axpy<Prec, NOUNIT>(n, A, ldA, x);
+                    else    __builtin_unreachable();
+                }
+            }
+        }
+        else {
+            // A**T*x = b or A**H*x = b
+            if (upper) {
+                if constexpr (is_floating_point_value<Prec>) {
                     if (unit) {
                         if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
                         else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
@@ -496,68 +481,88 @@ int trsv_selector(char uplo, char trans, char diag, int n,
                     }
                 }
                 else {
-                    if (unit) {
-                        if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, UNIT, CONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, UNIT, CONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ut_dot<Prec, UNIT, CONJ>(n, A, ldA, x);
-                        else    __builtin_unreachable();
+                    bool noconj = (trans == 'T' || trans == 't');
+                    if (noconj) {
+                        if (unit) {
+                            if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ut_dot<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            else    __builtin_unreachable();
+                        }
+                        else {
+                            if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ut_dot<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            else    __builtin_unreachable();
+                        }
                     }
                     else {
-                        if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, NOUNIT, CONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, NOUNIT, CONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ut_dot<Prec, NOUNIT, CONJ>(n, A, ldA, x);
-                        else    __builtin_unreachable();
+                        if (unit) {
+                            if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ut_dot<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            else    __builtin_unreachable();
+                        }
+                        else {
+                            if      constexpr (kernel_type == UNROLL_1) trsv_ut<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == UNROLL_2) trsv_ut_unroll_2<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == USE_BLAS_CALL) trsv_ut_dot<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            else    __builtin_unreachable();
+                        }
                     }
                 }
             }
-        }
-        else { // lower
-            if constexpr (is_floating_point_value<Prec>) {
-                if (unit) {
-                    if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
-                    else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, UNIT, CONJ>(n, A, ldA, x);
-                    else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, UNIT, NOCONJ>(n, A, ldA, x);
-                    else    __builtin_unreachable();
-                }
-                else {
-                    if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
-                    else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, NOUNIT, CONJ>(n, A, ldA, x);
-                    else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
-                    else    __builtin_unreachable();
-                }
-            }
-            else {
-                bool noconj = (trans == 'T' || trans == 't');
-                if (noconj) {
+            else { // lower
+                if constexpr (is_floating_point_value<Prec>) {
                     if (unit) {
                         if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                        else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, UNIT, CONJ>(n, A, ldA, x);
                         else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, UNIT, NOCONJ>(n, A, ldA, x);
                         else    __builtin_unreachable();
                     }
                     else {
                         if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                        else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, NOUNIT, CONJ>(n, A, ldA, x);
                         else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
                         else    __builtin_unreachable();
                     }
                 }
                 else {
-                    if (unit) {
-                        if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, UNIT, CONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, UNIT, CONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, UNIT, CONJ>(n, A, ldA, x);
-                        else    __builtin_unreachable();
+                    bool noconj = (trans == 'T' || trans == 't');
+                    if (noconj) {
+                        if (unit) {
+                            if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, UNIT, NOCONJ>(n, A, ldA, x);
+                            else    __builtin_unreachable();
+                        }
+                        else {
+                            if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, NOUNIT, NOCONJ>(n, A, ldA, x);
+                            else    __builtin_unreachable();
+                        }
                     }
                     else {
-                        if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, NOUNIT, CONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, NOUNIT, CONJ>(n, A, ldA, x);
-                        else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, NOUNIT, CONJ>(n, A, ldA, x);
-                        else    __builtin_unreachable();
+                        if (unit) {
+                            if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, UNIT, CONJ>(n, A, ldA, x);
+                            else    __builtin_unreachable();
+                        }
+                        else {
+                            if      constexpr (kernel_type == UNROLL_1) trsv_lt<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == UNROLL_2) trsv_lt_unroll2<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            else if constexpr (kernel_type == USE_BLAS_CALL) trsv_lt_dot<Prec, NOUNIT, CONJ>(n, A, ldA, x);
+                            else    __builtin_unreachable();
+                        }
                     }
                 }
             }
         }
+    }
+    else { // incx != 1
+        // TODO: reference implementation
     }
     return info;
 }
