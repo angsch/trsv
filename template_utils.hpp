@@ -91,8 +91,8 @@ void print(int m, int n, const std::vector<T> &mat, int ld, std::string label = 
                 std::cout << std::scientific << mat[i + j * ld] << " ";
             } else { // complex<float>, complex<double>
                 std::cout << std::scientific 
-                          << "(" << mat[i + j * ld].real() << ", "
-                          << mat[i + j * ld].imag() << "i) ";
+                          << mat[i + j * ld].real() << " + "
+                          << mat[i + j * ld].imag() << "i, ";
             }
         }
         std::cout << std::endl;

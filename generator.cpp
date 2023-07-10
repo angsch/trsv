@@ -36,7 +36,7 @@ void generator<T>::generate_triangular_matrix(char uplo, char diag, int n, T *ma
                 mat[(size_t)j + (size_t)j * ld] = T(1.0);
             }
             else {
-                mat[(size_t)j + (size_t)j * ld] = (*this)(j, j);
+                mat[(size_t)j + (size_t)j * ld] = T(2.0*n) + (*this)(j, j);
             }
 
             // Upper triangular part.
@@ -48,7 +48,7 @@ void generator<T>::generate_triangular_matrix(char uplo, char diag, int n, T *ma
     if (lower) {
         for (int j = 0; j < n; j++) {
             // Lower triangular part.
-            for (int i = 0; i < j; i++) {
+            for (int i = j; i < n; i++) {
                 mat[(size_t)i + (size_t)j * ld] = (*this)(j, j);
             }
 
@@ -58,11 +58,11 @@ void generator<T>::generate_triangular_matrix(char uplo, char diag, int n, T *ma
                 mat[(size_t)j + (size_t)j * ld] = T(1.0);
             }
             else {
-                mat[(size_t)j + (size_t)j * ld] = (*this)(j, j);
+                mat[(size_t)j + (size_t)j * ld] = T(2.0*n) + (*this)(j, j);
             }
 
             // Set upper triangular part to zero for readability.
-            for (int i = j + 1; i < n; i++) {
+            for (int i = 0; i < j; i++) {
                 mat[(size_t)i + (size_t)j * ld] = T(0.0);
             }
         }
