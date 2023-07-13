@@ -26,7 +26,7 @@ void generator<T>::generate_triangular_matrix(char uplo, char diag, int n, T *ma
     if (upper) {
         for (int j = 0; j < n; j++) {
             // Set lower triangular part to zero for readability.
-            for (int i = 0; i < j; i++) {
+            for (int i = j + 1; i < n; i++) {
                 mat[(size_t)i + (size_t)j * ld] = T(0.0);
             }
 
@@ -40,7 +40,7 @@ void generator<T>::generate_triangular_matrix(char uplo, char diag, int n, T *ma
             }
 
             // Upper triangular part.
-            for (int i = j + 1; i < n; i++) {
+            for (int i = 0; i < j; i++) {
                 mat[(size_t)i + (size_t)j * ld] = (*this)(i, j);
             }
         }
@@ -70,6 +70,43 @@ void generator<T>::generate_triangular_matrix(char uplo, char diag, int n, T *ma
     #undef A
 }
 
+template<typename T>
+void generator<T>::generate_upper_quasitriangular_matrix(int n, T *mat, int ld) {
+    if constexpr (is_complex_value<T>) {
+        generate_triangular_matrix('U', 'N', n, mat, ld);
+    }
+    else {
+        // real
+        generate_triangular_matrix('U', 'U', n, mat, ld);
+        using Real = remove_complex_t<T>;
+        int num_complex = n / 2;
+        int num_real = n - num_complex;
+        for (int i = 0; i < n; i++) {
+            mat[i+i*(size_t)ld] = T(n + i + 1.0);
+        }
+
+        index_generator<int> rg(0, num_complex, 1);
+        int *indices = (int *) malloc(num_real * sizeof(int));
+        rg.generate_1d_index_vector(num_real, indices);
+        int *gaps = (int *) malloc((num_complex+1) * sizeof(int));
+        for (int i = 0; i < num_real; i++) {
+            gaps[indices[i]]++;
+        }
+
+        int j = 0;
+        for (int i = 0; i < num_complex; i++) {
+            j = gaps[i] + j;
+            Real lambda_re = mat[j+j*(size_t)ld];
+            Real lambda_im = std::abs(lambda_re);
+            mat[j+j*(size_t)ld] = lambda_re;   mat[j+(j+1)*(size_t)ld] = -lambda_im;
+            mat[j+1+j*(size_t)ld] = lambda_im; mat[(j+1)+(j+1)*(size_t)ld]  =  lambda_re;
+            j = j + 2;
+        }
+
+        free(indices);
+        free(gaps);
+    }
+}
 
 template<>
 float generator<float>::operator()() {
@@ -111,3 +148,12 @@ std::complex<double> generator<std::complex<double>>::operator()(int row, int co
   return std::complex<double>{ d(gen), d(gen) };
 }
 
+template<>
+int index_generator<int>::operator()(int i) {
+  return d(gen);
+}
+
+template<>
+long index_generator<long>::operator()(long i) {
+  return d(gen);
+}
